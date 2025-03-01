@@ -9,11 +9,11 @@ There's lots of good stuff in there (some issues too of course - we wouldn't be 
 
 It's based around test driven development 
 
-now, I've not been a huge fan of test driven development, I find the initial definition of the problem 
+now, I've not been a huge fan of test driven development, I find the initial definition of  
 the aim/problem within the test a little artificial. I've also found IDE support for this poor:
 creation of tests from existing files seems better supported.
 
-anyway the book got me thinking - could the test development phase be improved by using prompts to an LLM?
+anyway, the book got me thinking - could the test development phase be improved by using prompts to an LLM?
 
 ### the idea
 if we can clearly state our aims and have test code generated for us
