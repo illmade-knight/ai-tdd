@@ -6,7 +6,7 @@ generating an svg 'analog' clock with hands for hour, minute, second
 quixotic? well are you really going to use golang for svgs and especially ones that update 
 regularly?
 
-the new idea to start is using [Juypter](https://jupyter.org/) to sketch out ideas in advance.
+the new idea id to start is using [Juypter](https://jupyter.org/) to sketch out ideas in advance.
 
 we'll use the python kernel (why?: it's good, 
 we're trying to avoid copying and pasting our implementation across and thinking instead).
@@ -39,3 +39,6 @@ write tests for this
 
 this was one of our first big fails - Gemini constantly got the clock face reversed and wrote
 tests that said 45 minutes should be at point (1, 0)
+
+maybe now is the time to start introducing more models: deepseek and open ai's o3 model look like
+good candidates.

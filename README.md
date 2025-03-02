@@ -27,3 +27,9 @@ by analysing it we may reinforce our own ideas, or change them
 * [basic](basic), try out some basic prompts
 * [shapes](shapes), move onto something more complex
 * [clock](clock), some basic math, things start to go wrong...
+
+### branches
+things were going well but we've encountered some problems - 
+we'll start tracking results on different platforms 
+
+so lets start with our initial llm, gemini - we'll record raw outcomes, warts and all
