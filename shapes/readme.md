@@ -52,4 +52,4 @@ this is already interesting - my thinking for the tests has already expanded bey
 
 The expected Triangle is more general than the one in the gitbook and to pass the tests I've used a simple Heron's formula implementation 
 
-we'll move onto [concurrency](concurrency) before doing something more complex in [clock](clock)
+we'll move onto [concurrency](../concurrency) before doing something more complex in [clock](../clock)
