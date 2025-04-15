@@ -23,7 +23,7 @@ if we can clearly state our aims and have test code generated for us
 4) we get a kind of peer programming experience - the LLMs solution may be unexpected - 
 by analysing it we may reinforce our own ideas, or change them
 
-### content
+### basic content
 * [basic](basic), try out some basic prompts
 * [shapes](shapes), move onto something more complex
 * [clock](clock), some basic math, things start to go wrong...
@@ -33,3 +33,18 @@ things were going well but we've encountered some problems -
 we'll start tracking results on different platforms 
 
 so lets start with our initial llm, gemini - we'll record raw outcomes, warts and all
+
+## moving forward
+
+we're now going to use this to develop things further - the first experiment is to
+increase the initial context to give the agent more an idea of what we're trying to achieve
+
+1) build libraries
+2) build microservices etc
+
+and using our prompts to create first tests and then review code - you can read it like an agent by
+opening [general_prompt](general_prompt.md) amd the gemini 2.5 response in [general_response](general_response.md)
+
+### more content
+* [core](core), we'll build a shared lib in here
+* [games](games), we'll look at building microservices here
