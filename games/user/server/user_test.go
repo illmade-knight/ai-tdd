@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"games/user/lib"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -42,14 +43,14 @@ func (s *SpyPlayerStore) GetPlayerScore(name string) (int, error) {
 		// Return 0 score and the specific error
 		return 0, ErrUserNotFound
 	}
-	// User found, return score and nil error
+	// lib.User found, return score and nil error
 	return score, nil
 }
 
 // RecordWin simulates recording a win by incrementing the score in the mock
 // store and recording the name of the player for spying purposes.
 // RecordWin (Updated) simulates recording a win.
-// If user doesn't exist, creates them with score 1. Otherwise increments.
+// If lib.User doesn't exist, creates them with score 1. Otherwise increments.
 func (s *SpyPlayerStore) RecordWin(name string) {
 	s.recordWinCalls = append(s.recordWinCalls, name)
 	// Get current score (or 0 if new) - ignore error for simplicity in mock logic here
@@ -57,11 +58,11 @@ func (s *SpyPlayerStore) RecordWin(name string) {
 	s.scores[name] = currentScore + 1 // Increment score
 }
 
-func (s *SpyPlayerStore) GetLeague() []User {
+func (s *SpyPlayerStore) GetLeague() []lib.User {
 
-	league := make([]User, 0, len(s.scores))
+	league := make([]lib.User, 0, len(s.scores))
 	for name, score := range s.scores {
-		league = append(league, User{Name: name, Score: score})
+		league = append(league, lib.User{Name: name, Score: score})
 	}
 
 	// Sort by score descending
@@ -97,7 +98,7 @@ func (s *SpyPlayerStore) StubScore(name string, score int) {
 // Helper function to create a PlayerServer instance for testing
 // This simulates creating the server and running its setup logic (like Start).
 // ErrUserNotFound definition
-// User struct definition
+// lib.User struct definition
 // PlayerStore interface definition
 // SpyPlayerStore struct and methods (updated GetPlayerScore, RecordWin)
 
@@ -116,7 +117,7 @@ func setupTestServer(t *testing.T) (*PlayerServer, *SpyPlayerStore) {
 		score, err := store.GetPlayerScore(playerName)
 
 		if errors.Is(err, ErrUserNotFound) {
-			// User not found scenario
+			// lib.User not found scenario
 			w.WriteHeader(http.StatusNotFound)
 			return
 		} else if err != nil {
@@ -126,13 +127,13 @@ func setupTestServer(t *testing.T) (*PlayerServer, *SpyPlayerStore) {
 			return
 		}
 
-		// User found, prepare JSON response
-		user := User{Name: playerName, Score: score}
+		// lib.User found, prepare JSON response
+		user := lib.User{Name: playerName, Score: score}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK) // Explicitly set OK status
 
-		// Marshal User struct to JSON and write to response
+		// Marshal lib.User struct to JSON and write to response
 		if err := json.NewEncoder(w).Encode(user); err != nil {
 			// Handle potential JSON encoding error
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -166,7 +167,7 @@ func TestPlayerServer_GETScore(t *testing.T) {
 		initialScore    int  // Score to stub in the store
 		expectUserFound bool // Flag to distinguish 404 from 200
 		expectedStatus  int
-		expectedBody    User // Expected User struct for successful cases
+		expectedBody    lib.User // Expected lib.User struct for successful cases
 	}{
 		{
 			name:            "Get score for existing player",
@@ -174,7 +175,7 @@ func TestPlayerServer_GETScore(t *testing.T) {
 			initialScore:    5,
 			expectUserFound: true,
 			expectedStatus:  http.StatusOK,
-			expectedBody:    User{Name: "Alice", Score: 5},
+			expectedBody:    lib.User{Name: "Alice", Score: 5},
 		},
 		{
 			name:            "Get score for another existing player",
@@ -182,7 +183,7 @@ func TestPlayerServer_GETScore(t *testing.T) {
 			initialScore:    10,
 			expectUserFound: true,
 			expectedStatus:  http.StatusOK,
-			expectedBody:    User{Name: "Bob", Score: 10},
+			expectedBody:    lib.User{Name: "Bob", Score: 10},
 		},
 		{
 			name:            "Get score for existing player with zero score",
@@ -190,7 +191,7 @@ func TestPlayerServer_GETScore(t *testing.T) {
 			initialScore:    0, // Explicitly test score 0 vs not found
 			expectUserFound: true,
 			expectedStatus:  http.StatusOK,
-			expectedBody:    User{Name: "ZeroZorro", Score: 0},
+			expectedBody:    lib.User{Name: "ZeroZorro", Score: 0},
 		},
 		{
 			name:            "Get score for non-existent player",
@@ -198,13 +199,13 @@ func TestPlayerServer_GETScore(t *testing.T) {
 			initialScore:    0,     // Store starts empty
 			expectUserFound: false, // Expect a 404
 			expectedStatus:  http.StatusNotFound,
-			expectedBody:    User{}, // Body will be empty/ignored for 404
+			expectedBody:    lib.User{}, // Body will be empty/ignored for 404
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Stub the score only if the user is expected to exist
+			// Stub the score only if the lib.User is expected to exist
 			if tt.expectUserFound {
 				store.StubScore(tt.playerName, tt.initialScore)
 			}
@@ -229,8 +230,8 @@ func TestPlayerServer_GETScore(t *testing.T) {
 					t.Errorf("handler returned wrong Content-Type: got %q want %q", contentType, expectedContentType)
 				}
 
-				// Decode JSON response body into a User struct
-				var gotUser User
+				// Decode JSON response body into a lib.User struct
+				var gotUser lib.User
 				err := json.NewDecoder(response.Body).Decode(&gotUser)
 				if err != nil {
 					t.Fatalf("Could not decode JSON response body: %v", err)
@@ -256,7 +257,7 @@ func TestPlayerServer_PUTScore(t *testing.T) {
 	requestPath := fmt.Sprintf("/user/%s/score", playerName)
 
 	// --- First PUT (User initially doesn't exist) ---
-	t.Run("first PUT creates user with score 1", func(t *testing.T) {
+	t.Run("first PUT creates lib.User with score 1", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodPut, requestPath, nil)
 		response := httptest.NewRecorder()
 		server.Handler.ServeHTTP(response, request)
@@ -282,7 +283,7 @@ func TestPlayerServer_PUTScore(t *testing.T) {
 	})
 
 	// --- Second PUT (User now exists) ---
-	t.Run("second PUT increments existing user score", func(t *testing.T) {
+	t.Run("second PUT increments existing lib.User score", func(t *testing.T) {
 		// Ensure previous state is reflected (Alice has score 1)
 		request, _ := http.NewRequest(http.MethodPut, requestPath, nil)
 		response := httptest.NewRecorder()

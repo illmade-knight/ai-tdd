@@ -3,6 +3,8 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"games/user/lib"
+	"games/user/store"
 	"net/http"
 	"sort"
 	"sync"
@@ -11,38 +13,18 @@ import (
 // ErrUserNotFound is returned by PlayerStore when a user is not found.
 var ErrUserNotFound = errors.New("user not found")
 
-// User represents the data structure for a player.
-type User struct {
-	// Use json struct tags for correct marshalling
-	Name  string `json:"name"`
-	Score int    `json:"score"`
-}
-
-// --- Interface Definition (Requirement) ---
-// --- PlayerStore Interface (Updated) ---
-
-// PlayerStore defines the interface for storing and retrieving player scores.
-// This allows mocking for tests and flexibility in implementation.
-
-type PlayerStore interface {
-	// GetPlayerScore now returns (score, error)
-	GetPlayerScore(name string) (int, error)
-	RecordWin(name string)
-	GetLeague() []User // New method to get sorted league data
-}
-
 // --- PlayerServer Definition (Minimal structure assumed for tests) ---
 
 // PlayerServer holds dependencies like the PlayerStore and handles HTTP requests.
 // (This would be defined in your actual server code)
 type PlayerServer struct {
-	store PlayerStore
+	store store.PlayerStore
 	// Assume Start() configures this handler
 	Handler http.Handler
 }
 
 // NewPlayerServer creates a server (actual implementation detail)
-func NewPlayerServer(store PlayerStore) *PlayerServer {
+func NewPlayerServer(store store.PlayerStore) *PlayerServer {
 	return &PlayerServer{store: store}
 }
 
@@ -60,7 +42,7 @@ func (p *PlayerServer) Start() {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		user := User{Name: playerName, Score: score}
+		user := lib.User{Name: playerName, Score: score}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(user)
@@ -135,13 +117,13 @@ func (i *InMemoryPlayerStore) RecordWin(name string) {
 
 // GetLeague (Implementation added here for completeness, though test will fail before calling it)
 // In real scenario, this would be in the actual InMemoryPlayerStore implementation file.
-func (i *InMemoryPlayerStore) GetLeague() []User {
+func (i *InMemoryPlayerStore) GetLeague() []lib.User {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
-	league := make([]User, 0, len(i.scores))
+	league := make([]lib.User, 0, len(i.scores))
 	for name, score := range i.scores {
-		league = append(league, User{Name: name, Score: score})
+		league = append(league, lib.User{Name: name, Score: score})
 	}
 
 	// Sort by score descending

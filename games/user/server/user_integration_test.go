@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"games/user/lib"
+	"games/user/store"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +16,7 @@ import (
 
 // Assume a function exists to create and configure the server's handler
 // This simulates calling server.Start() without blocking, just setting up routes.
-func NewTestPlayerServer(store PlayerStore) *PlayerServer {
+func NewTestPlayerServer(store store.PlayerStore) *PlayerServer {
 	mux := http.NewServeMux() // Or your router of choice
 
 	// GET Handler logic (copied from previous test setup for completeness)
@@ -28,7 +30,7 @@ func NewTestPlayerServer(store PlayerStore) *PlayerServer {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		user := User{Name: playerName, Score: score}
+		user := lib.User{Name: playerName, Score: score}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(user)
@@ -53,11 +55,11 @@ func TestPlayerServerIntegration(t *testing.T) {
 	// --- Test Setup ---
 	// 1. Create the store instance we want to test against.
 	//    (This is where you could swap in a different store implementation later)
-	store := NewInMemoryPlayerStore()
+	s := NewInMemoryPlayerStore()
 
 	// 2. Create the PlayerServer using the chosen store.
 	//    This assumes NewTestPlayerServer correctly sets up the routes/handler.
-	playerServer := NewTestPlayerServer(store)
+	playerServer := NewTestPlayerServer(s)
 
 	// 3. Start a test HTTP server using the PlayerServer's handler.
 	//    httptest.NewServer finds an available port and listens on it.
@@ -120,7 +122,7 @@ func TestPlayerServerIntegration(t *testing.T) {
 		assertContentType(t, getResp, "application/json")
 
 		// Assert response body
-		expectedUser := User{Name: playerName, Score: 1}
+		expectedUser := lib.User{Name: playerName, Score: 1}
 		assertUserResponse(t, getResp.Body, expectedUser)
 	})
 
@@ -157,34 +159,34 @@ func TestPlayerServerIntegration(t *testing.T) {
 		// Assert status and body
 		assertStatusCode(t, getResp.StatusCode, http.StatusOK)
 		assertContentType(t, getResp, "application/json")
-		expectedUser := User{Name: playerName, Score: 2} // Expect score 2
+		expectedUser := lib.User{Name: playerName, Score: 2} // Expect score 2
 		assertUserResponse(t, getResp.Body, expectedUser)
 	})
 
 	// Helper function for setting up server and store for a subtest
-	setup := func(t *testing.T) (*httptest.Server, PlayerStore) {
+	setup := func(t *testing.T) (*httptest.Server, store.PlayerStore) {
 		t.Helper()
-		store := NewInMemoryPlayerStore()
-		playerServer := NewTestPlayerServer(store)
+		playerStore := NewInMemoryPlayerStore()
+		playerServer := NewTestPlayerServer(playerStore)
 		testServer := httptest.NewServer(playerServer.Handler)
 		t.Cleanup(func() { testServer.Close() })
-		return testServer, store
+		return testServer, playerStore
 	}
 	// --- New Failing Test for /league ---
 	t.Run("Get league table", func(t *testing.T) {
 		// Setup server and store specifically for this test
-		testServer, store := setup(t)
+		testServer, s := setup(t)
 
 		// Pre-populate the store with data for the league table
-		store.RecordWin("Charlie") // Score 1
-		store.RecordWin("Alice")   // Score 1
-		store.RecordWin("Alice")   // Score 2
-		store.RecordWin("Bob")     // Score 1
-		store.RecordWin("Bob")     // Score 2
-		store.RecordWin("Bob")     // Score 3
+		s.RecordWin("Charlie") // Score 1
+		s.RecordWin("Alice")   // Score 1
+		s.RecordWin("Alice")   // Score 2
+		s.RecordWin("Bob")     // Score 1
+		s.RecordWin("Bob")     // Score 2
+		s.RecordWin("Bob")     // Score 3
 
 		// Expected league order: Bob (3), Alice (2), Charlie (1)
-		expectedLeague := []User{
+		expectedLeague := []lib.User{
 			{Name: "Bob", Score: 3},
 			{Name: "Alice", Score: 2},
 			{Name: "Charlie", Score: 1},
@@ -205,7 +207,7 @@ func TestPlayerServerIntegration(t *testing.T) {
 		assertContentType(t, resp, "application/json")      // Will fail
 
 		// Assert response body matches the expected sorted league
-		var gotLeague []User
+		var gotLeague []lib.User
 		err = json.NewDecoder(resp.Body).Decode(&gotLeague)
 		if err != nil {
 			// Read body for error context if decode fails
@@ -235,9 +237,9 @@ func assertContentType(t *testing.T, resp *http.Response, want string) {
 	}
 }
 
-func assertUserResponse(t *testing.T, body io.Reader, want User) {
+func assertUserResponse(t *testing.T, body io.Reader, want lib.User) {
 	t.Helper()
-	var got User
+	var got lib.User
 	err := json.NewDecoder(body).Decode(&got)
 	if err != nil {
 		// Try reading the raw body for better error message if decode fails
