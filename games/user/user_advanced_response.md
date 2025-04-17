@@ -1,40 +1,49 @@
-package server // Or your service package name + _test
+Okay, let's update the tests to incorporate the new requirements: 404 for non-existent users, JSON responses for successful GETs, and error handling from the `PlayerStore`.
+
+---
+
+**Step 1: Define Error and User Struct**
+
+We need a standard error for "not found" and the `User` struct. These would typically live in a shared package or alongside the interface definition.
+
+```go
+package main_test // Or potentially a shared 'types' or 'store' package
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
-	"sort"
-	"testing"
+	// ... other imports
 )
 
-// --- Mock Implementation (For Testing) ---
+// ErrUserNotFound is returned by PlayerStore when a user is not found.
+var ErrUserNotFound = errors.New("user not found")
 
-// SpyPlayerStore is a mock implementation of PlayerStore for testing.
-// It allows stubbing scores and spying on calls like RecordWin.
-type SpyPlayerStore struct {
-	// scores stores the scores for players, acting as our mock DB table.
-	scores map[string]int
-	// recordWinCalls stores the names of players for whom RecordWin was called.
-	recordWinCalls []string
-	// t is the testing context, useful for signaling errors from the mock if needed.
-	t *testing.T
+// User represents the data structure for a player.
+type User struct {
+	// Use json struct tags for correct marshalling
+	Name  string `json:"name"`
+	Score int    `json:"score"`
 }
 
-// NewSpyPlayerStore initializes a new SpyPlayerStore.
-func NewSpyPlayerStore(t *testing.T) *SpyPlayerStore {
-	return &SpyPlayerStore{
-		scores:         make(map[string]int),
-		recordWinCalls: []string{},
-		t:              t,
-	}
+// --- PlayerStore Interface (Updated) ---
+type PlayerStore interface {
+	// GetPlayerScore now returns (score, error)
+	GetPlayerScore(name string) (int, error)
+	RecordWin(name string)
 }
 
-// GetPlayerScore retrieves the score for a player from the mock store.
-// If the player is not found, it returns 0 as per requirements.
+```
+
+---
+
+**Step 2: Update Mock Implementation (`SpyPlayerStore`)**
+
+The mock needs to return the error and handle `RecordWin` potentially creating a user.
+
+```go
+// Keep SpyPlayerStore struct definition as before
+
+// NewSpyPlayerStore remains the same
+
 // GetPlayerScore (Updated) retrieves the score or returns ErrUserNotFound.
 func (s *SpyPlayerStore) GetPlayerScore(name string) (int, error) {
 	score, ok := s.scores[name]
@@ -46,8 +55,6 @@ func (s *SpyPlayerStore) GetPlayerScore(name string) (int, error) {
 	return score, nil
 }
 
-// RecordWin simulates recording a win by incrementing the score in the mock
-// store and recording the name of the player for spying purposes.
 // RecordWin (Updated) simulates recording a win.
 // If user doesn't exist, creates them with score 1. Otherwise increments.
 func (s *SpyPlayerStore) RecordWin(name string) {
@@ -57,45 +64,30 @@ func (s *SpyPlayerStore) RecordWin(name string) {
 	s.scores[name] = currentScore + 1 // Increment score
 }
 
-func (s *SpyPlayerStore) GetLeague() []User {
+// AssertRecordWinCalledWith remains the same
+// StubScore remains the same
+```
 
-	league := make([]User, 0, len(s.scores))
-	for name, score := range s.scores {
-		league = append(league, User{Name: name, Score: score})
-	}
+---
 
-	// Sort by score descending
-	sort.Slice(league, func(a, b int) bool {
-		return league[a].Score > league[b].Score
-	})
+**Step 3: Update Test Server Setup (Simulated Handlers)**
 
-	return league
-}
+The placeholder handlers within `setupTestServer` need to reflect the new logic (error checking, JSON marshalling).
 
-// Helper for tests to check RecordWin calls
-func (s *SpyPlayerStore) AssertRecordWinCalledWith(expectedName string) {
-	s.t.Helper()
-	found := false
-	for _, name := range s.recordWinCalls {
-		if name == expectedName {
-			found = true
-			break
-		}
-	}
-	if !found {
-		s.t.Errorf("expected RecordWin to be called with '%s', but calls were %v", expectedName, s.recordWinCalls)
-	}
-}
+```go
+package main_test
 
-// Helper to preload scores for testing GET
-func (s *SpyPlayerStore) StubScore(name string, score int) {
-	s.scores[name] = score
-}
+import (
+	"encoding/json" // Added for JSON marshalling
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"reflect" // Added for deep comparison of structs
+	"testing"
+	// main "path/to/your/server/code"
+)
 
-// --- Tests ---
-
-// Helper function to create a PlayerServer instance for testing
-// This simulates creating the server and running its setup logic (like Start).
 // ErrUserNotFound definition
 // User struct definition
 // PlayerStore interface definition
@@ -142,19 +134,28 @@ func setupTestServer(t *testing.T) (*PlayerServer, *SpyPlayerStore) {
 
 	// --- Updated PUT Handler Simulation (Response unchanged for now) ---
 	mux.HandleFunc("PUT /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
-		playerName := r.PathValue("name")  // Requires Go 1.22+
-		store.RecordWin(playerName)        // Call the updated RecordWin
+		playerName := r.PathValue("name") // Requires Go 1.22+
+		store.RecordWin(playerName)       // Call the updated RecordWin
 		w.WriteHeader(http.StatusAccepted) // Keep response as Accepted
 	})
 	// --- End Route Setup Simulation ---
 
 	server := &PlayerServer{
-		store:   store,
+		Store:   store,
 		Handler: mux,
 	}
 	return server, store
 }
 
+```
+
+---
+
+**Step 4: Update Tests (`TestPlayerServer_GETScore`, `TestPlayerServer_PUTScore`)**
+
+Adjust assertions for status codes, JSON bodies, and error handling in store calls.
+
+```go
 // --- Updated GET Tests ---
 func TestPlayerServer_GETScore(t *testing.T) {
 	server, store := setupTestServer(t)
@@ -163,7 +164,7 @@ func TestPlayerServer_GETScore(t *testing.T) {
 	tests := []struct {
 		name            string
 		playerName      string
-		initialScore    int  // Score to stub in the store
+		initialScore    int // Score to stub in the store
 		expectUserFound bool // Flag to distinguish 404 from 200
 		expectedStatus  int
 		expectedBody    User // Expected User struct for successful cases
@@ -185,17 +186,17 @@ func TestPlayerServer_GETScore(t *testing.T) {
 			expectedBody:    User{Name: "Bob", Score: 10},
 		},
 		{
-			name:            "Get score for existing player with zero score",
-			playerName:      "ZeroZorro",
-			initialScore:    0, // Explicitly test score 0 vs not found
-			expectUserFound: true,
-			expectedStatus:  http.StatusOK,
-			expectedBody:    User{Name: "ZeroZorro", Score: 0},
-		},
+            name:            "Get score for existing player with zero score",
+            playerName:      "ZeroZorro",
+            initialScore:    0, // Explicitly test score 0 vs not found
+            expectUserFound: true,
+            expectedStatus:  http.StatusOK,
+            expectedBody:    User{Name: "ZeroZorro", Score: 0},
+        },
 		{
 			name:            "Get score for non-existent player",
 			playerName:      "Charlie",
-			initialScore:    0,     // Store starts empty
+			initialScore:    0, // Store starts empty
 			expectUserFound: false, // Expect a 404
 			expectedStatus:  http.StatusNotFound,
 			expectedBody:    User{}, // Body will be empty/ignored for 404
@@ -241,9 +242,9 @@ func TestPlayerServer_GETScore(t *testing.T) {
 					t.Errorf("handler returned unexpected body: got %+v want %+v", gotUser, tt.expectedBody)
 				}
 			} else if response.Body.Len() > 0 && tt.expectedStatus == http.StatusNotFound {
-				// Optionally check that the body is empty on 404
-				t.Errorf("expected empty body for 404, but got %q", response.Body.String())
-			}
+                // Optionally check that the body is empty on 404
+                t.Errorf("expected empty body for 404, but got %q", response.Body.String())
+            }
 		})
 	}
 }
@@ -308,7 +309,20 @@ func TestPlayerServer_PUTScore(t *testing.T) {
 		// Depending on how t.Run isolates state or if the store is reset, adjust this check.
 		// Assuming store state persists across t.Run in this setup:
 		if len(store.recordWinCalls) != 2 {
-			t.Errorf("expected RecordWin to be called twice in total, got %d calls", len(store.recordWinCalls))
-		}
+             t.Errorf("expected RecordWin to be called twice in total, got %d calls", len(store.recordWinCalls))
+        }
 	})
 }
+
+```
+
+**Summary of Changes:**
+
+1.  Defined `ErrUserNotFound` and the `User` struct with JSON tags.
+2.  Updated `PlayerStore` interface (`GetPlayerScore` now returns `(int, error)`).
+3.  Modified `SpyPlayerStore`: `GetPlayerScore` returns the error; `RecordWin` handles user creation implicitly.
+4.  Updated placeholder handlers in `setupTestServer`: GET checks for `ErrUserNotFound` to return 404, otherwise returns JSON; PUT calls the updated `RecordWin`.
+5.  Updated `TestPlayerServer_GETScore`: Checks for 404 status on not found, checks for 200 and Content-Type and unmarshals/compares the JSON `User` struct on success. Added a test case for score 0 vs not found.
+6.  Updated `TestPlayerServer_PUTScore`: Adjusted the score verification logic within the test to use the error-returning `GetPlayerScore` and validated the create-then-increment flow.
+
+These tests now accurately reflect the requirements for JSON responses and 404 error handling based on the `PlayerStore`'s ability to signal when a user is not found.
