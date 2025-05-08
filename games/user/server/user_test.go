@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"games/user/lib"
+	"games/user/store"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -41,7 +42,7 @@ func (s *SpyPlayerStore) GetPlayerScore(name string) (int, error) {
 	score, ok := s.scores[name]
 	if !ok {
 		// Return 0 score and the specific error
-		return 0, ErrUserNotFound
+		return 0, store.ErrUserNotFound
 	}
 	// lib.User found, return score and nil error
 	return score, nil
@@ -107,16 +108,16 @@ func (s *SpyPlayerStore) StubScore(name string, score int) {
 // Helper function to create a PlayerServer instance for testing (Updated Handlers)
 func setupTestServer(t *testing.T) (*PlayerServer, *SpyPlayerStore) {
 	t.Helper()
-	store := NewSpyPlayerStore(t)
+	s := NewSpyPlayerStore(t)
 	mux := http.NewServeMux()
 
 	// --- Updated GET Handler Simulation ---
 	mux.HandleFunc("GET /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
 		playerName := r.PathValue("name") // Requires Go 1.22+
 
-		score, err := store.GetPlayerScore(playerName)
+		score, err := s.GetPlayerScore(playerName)
 
-		if errors.Is(err, ErrUserNotFound) {
+		if errors.Is(err, store.ErrUserNotFound) {
 			// lib.User not found scenario
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -144,21 +145,21 @@ func setupTestServer(t *testing.T) (*PlayerServer, *SpyPlayerStore) {
 	// --- Updated PUT Handler Simulation (Response unchanged for now) ---
 	mux.HandleFunc("PUT /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
 		playerName := r.PathValue("name")  // Requires Go 1.22+
-		store.RecordWin(playerName)        // Call the updated RecordWin
+		s.RecordWin(playerName)            // Call the updated RecordWin
 		w.WriteHeader(http.StatusAccepted) // Keep response as Accepted
 	})
 	// --- End Route Setup Simulation ---
 
 	server := &PlayerServer{
-		store:   store,
+		store:   s,
 		Handler: mux,
 	}
-	return server, store
+	return server, s
 }
 
 // --- Updated GET Tests ---
 func TestPlayerServer_GETScore(t *testing.T) {
-	server, store := setupTestServer(t)
+	server, s := setupTestServer(t)
 
 	// Define test cases for GET (expectedBody now interface{} for JSON unmarshalling)
 	tests := []struct {
@@ -207,7 +208,7 @@ func TestPlayerServer_GETScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Stub the score only if the lib.User is expected to exist
 			if tt.expectUserFound {
-				store.StubScore(tt.playerName, tt.initialScore)
+				s.StubScore(tt.playerName, tt.initialScore)
 			}
 
 			requestPath := fmt.Sprintf("/user/%s/score", tt.playerName)
@@ -251,7 +252,7 @@ func TestPlayerServer_GETScore(t *testing.T) {
 
 // --- Updated PUT Tests ---
 func TestPlayerServer_PUTScore(t *testing.T) {
-	server, store := setupTestServer(t)
+	server, s := setupTestServer(t)
 
 	playerName := "Alice"
 	requestPath := fmt.Sprintf("/user/%s/score", playerName)
@@ -269,10 +270,10 @@ func TestPlayerServer_PUTScore(t *testing.T) {
 		}
 
 		// Assert store interaction
-		store.AssertRecordWinCalledWith(playerName)
+		s.AssertRecordWinCalledWith(playerName)
 
 		// Verify score in store (using the updated GetPlayerScore)
-		actualScore, err := store.GetPlayerScore(playerName)
+		actualScore, err := s.GetPlayerScore(playerName)
 		if err != nil {
 			t.Fatalf("Error getting score after first PUT: %v", err) // Should not be ErrUserNotFound anymore
 		}
@@ -296,7 +297,7 @@ func TestPlayerServer_PUTScore(t *testing.T) {
 		}
 
 		// Verify score in store
-		actualScore, err := store.GetPlayerScore(playerName)
+		actualScore, err := s.GetPlayerScore(playerName)
 		if err != nil {
 			t.Fatalf("Error getting score after second PUT: %v", err)
 		}
@@ -308,8 +309,8 @@ func TestPlayerServer_PUTScore(t *testing.T) {
 		// Check total RecordWin calls if needed (should be 2 now across both subtests)
 		// Depending on how t.Run isolates state or if the store is reset, adjust this check.
 		// Assuming store state persists across t.Run in this setup:
-		if len(store.recordWinCalls) != 2 {
-			t.Errorf("expected RecordWin to be called twice in total, got %d calls", len(store.recordWinCalls))
+		if len(s.recordWinCalls) != 2 {
+			t.Errorf("expected RecordWin to be called twice in total, got %d calls", len(s.recordWinCalls))
 		}
 	})
 }

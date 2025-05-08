@@ -1,6 +1,12 @@
 package store
 
-import "games/user/lib"
+import (
+	"errors"
+	"games/user/lib"
+)
+
+// ErrUserNotFound is returned by PlayerStore when a user is not found.
+var ErrUserNotFound = errors.New("user not found")
 
 // --- Interface Definition (Requirement) ---
 // --- PlayerStore Interface (Updated) ---

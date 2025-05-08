@@ -10,20 +10,21 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
 
 // Assume a function exists to create and configure the server's handler
 // This simulates calling server.Start() without blocking, just setting up routes.
-func NewTestPlayerServer(store store.PlayerStore) *PlayerServer {
+func NewTestPlayerServer(s store.PlayerStore) *PlayerServer {
 	mux := http.NewServeMux() // Or your router of choice
 
 	// GET Handler logic (copied from previous test setup for completeness)
 	mux.HandleFunc("GET /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
 		playerName := r.PathValue("name") // Go 1.22+
-		score, err := store.GetPlayerScore(playerName)
-		if errors.Is(err, ErrUserNotFound) {
+		score, err := s.GetPlayerScore(playerName)
+		if errors.Is(err, store.ErrUserNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		} else if err != nil {
@@ -39,12 +40,21 @@ func NewTestPlayerServer(store store.PlayerStore) *PlayerServer {
 	// PUT Handler logic (copied from previous test setup for completeness)
 	mux.HandleFunc("PUT /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
 		playerName := r.PathValue("name") // Go 1.22+
-		store.RecordWin(playerName)
+		s.RecordWin(playerName)
 		w.WriteHeader(http.StatusAccepted)
 	})
 
+	mux.HandleFunc("GET /league", func(w http.ResponseWriter, r *http.Request) {
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		league := s.GetLeague()
+		json.NewEncoder(w).Encode(league)
+	})
+
 	return &PlayerServer{
-		store:   store,
+		store:   s,
 		Handler: mux, // The configured router/mux is the handler
 	}
 }
@@ -55,7 +65,7 @@ func TestPlayerServerIntegration(t *testing.T) {
 	// --- Test Setup ---
 	// 1. Create the store instance we want to test against.
 	//    (This is where you could swap in a different store implementation later)
-	s := NewInMemoryPlayerStore()
+	s := store.NewInMemoryPlayerStore()
 
 	// 2. Create the PlayerServer using the chosen store.
 	//    This assumes NewTestPlayerServer correctly sets up the routes/handler.
@@ -166,7 +176,10 @@ func TestPlayerServerIntegration(t *testing.T) {
 	// Helper function for setting up server and store for a subtest
 	setup := func(t *testing.T) (*httptest.Server, store.PlayerStore) {
 		t.Helper()
-		playerStore := NewInMemoryPlayerStore()
+		//playerStore := store.NewInMemoryPlayerStore()
+
+		playerStore, _ := createTempParquetStore(t)
+
 		playerServer := NewTestPlayerServer(playerStore)
 		testServer := httptest.NewServer(playerServer.Handler)
 		t.Cleanup(func() { testServer.Close() })
@@ -252,4 +265,21 @@ func assertUserResponse(t *testing.T, body io.Reader, want lib.User) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("handler returned unexpected body: got %+v want %+v", got, want)
 	}
+}
+
+// createTempParquetStore creates a ParquetPlayerStore using a temporary file.
+// It returns the store instance and the path to the temp file.
+// It uses t.Fatalf on errors during setup.
+func createTempParquetStore(t *testing.T) (*store.ParquetPlayerStore, string) {
+	t.Helper() // Mark as test helper
+
+	tempDir := t.TempDir() // Create temp dir, automatically cleaned up
+	tempFilePath := filepath.Join(tempDir, "test_players.parquet")
+
+	// Ensure NewParquetPlayerStore is accessible (might need import or be in same package)
+	s, err := store.NewParquetPlayerStore(tempFilePath)
+	if err != nil {
+		t.Fatalf("Failed to create ParquetPlayerStore for test: %v", err)
+	}
+	return s, tempFilePath
 }
