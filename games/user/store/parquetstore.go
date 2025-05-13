@@ -145,7 +145,7 @@ func (p *ParquetPlayerStore) GetPlayerScore(name string) (int, error) {
 }
 
 // RecordWin increments the score for a given player name in the file.
-func (p *ParquetPlayerStore) RecordWin(name string) {
+func (p *ParquetPlayerStore) RecordWin(name string) (*lib.User, error) {
 	p.mu.Lock() // Write lock for load/modify/save sequence
 	defer p.mu.Unlock()
 
@@ -153,7 +153,7 @@ func (p *ParquetPlayerStore) RecordWin(name string) {
 	if err != nil {
 		// Log critical error - cannot reliably update score if load fails
 		log.Printf("ERROR: Failed to load data in RecordWin for %s: %v. Score not updated.", name, err)
-		return // Cannot proceed
+		return nil, ErrDataSource
 	}
 
 	// Increment score (creates user with score 1 if not present)
@@ -168,17 +168,20 @@ func (p *ParquetPlayerStore) RecordWin(name string) {
 		// For now, the in-memory map *was* changed, but the file write failed.
 		// This highlights the limitations of the simple load/save approach.
 	}
+	log.Println("saved win")
+
+	return &lib.User{Name: name, Score: scores[name]}, nil
 }
 
 // GetLeague reads the file and returns all players sorted by score.
-func (p *ParquetPlayerStore) GetLeague() []lib.User {
+func (p *ParquetPlayerStore) GetLeague() ([]lib.User, error) {
 	p.mu.RLock() // Read lock for loading data
 	scores, err := p.loadData()
 	p.mu.RUnlock() // Release lock after loading
 
 	if err != nil {
 		log.Printf("ERROR: Failed to load data in GetLeague: %v. Returning empty league.", err)
-		return []lib.User{} // Return empty slice on error
+		return []lib.User{}, ErrDataSource // Return empty slice on error
 	}
 
 	// Convert map to slice
@@ -192,5 +195,5 @@ func (p *ParquetPlayerStore) GetLeague() []lib.User {
 		return league[a].Score > league[b].Score
 	})
 
-	return league
+	return league, nil
 }

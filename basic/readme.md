@@ -18,6 +18,8 @@ the generated test has a few test cases and covers 0, -1 repeats non-ascii input
 
 not bad - except for an odd quirk of gemini where it doesn't include golang's square brackets, slightly odd for a google
 developed programming language in a google developed LLM environment...
+(no longer the case in Gemini 2.5)
+
 
 Gemini also provides an explanation of what it's providing:
 

@@ -50,7 +50,7 @@ func (i *InMemoryPlayerStore) GetPlayerScore(name string) (int, error) {
 // RecordWin increments the score for a given player name.
 // If the player does not exist, they are created with a score of 1.
 // Uses a write lock to ensure exclusive access during modification.
-func (i *InMemoryPlayerStore) RecordWin(name string) {
+func (i *InMemoryPlayerStore) RecordWin(name string) (*lib.User, error) {
 	// Acquire a write lock - ensures exclusive access
 	i.mu.Lock()
 	// Ensure the lock is released
@@ -60,13 +60,17 @@ func (i *InMemoryPlayerStore) RecordWin(name string) {
 	currentScore := i.scores[name]
 	// Increment the score and update the map
 	i.scores[name] = currentScore + 1
+	return &lib.User{
+		Name:  name,
+		Score: i.scores[name],
+	}, nil
 }
 
 // Note: This implementation does not persist data. Scores are lost when the application stops.
 
 // GetLeague (Implementation added here for completeness, though test will fail before calling it)
 // In real scenario, this would be in the actual InMemoryPlayerStore implementation file.
-func (i *InMemoryPlayerStore) GetLeague() []lib.User {
+func (i *InMemoryPlayerStore) GetLeague() ([]lib.User, error) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
@@ -80,5 +84,5 @@ func (i *InMemoryPlayerStore) GetLeague() []lib.User {
 		return league[a].Score > league[b].Score
 	})
 
-	return league
+	return league, nil
 }

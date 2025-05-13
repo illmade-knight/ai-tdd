@@ -52,14 +52,18 @@ func (s *SpyPlayerStore) GetPlayerScore(name string) (int, error) {
 // store and recording the name of the player for spying purposes.
 // RecordWin (Updated) simulates recording a win.
 // If lib.User doesn't exist, creates them with score 1. Otherwise increments.
-func (s *SpyPlayerStore) RecordWin(name string) {
+func (s *SpyPlayerStore) RecordWin(name string) (*lib.User, error) {
 	s.recordWinCalls = append(s.recordWinCalls, name)
 	// Get current score (or 0 if new) - ignore error for simplicity in mock logic here
 	currentScore, _ := s.GetPlayerScore(name)
 	s.scores[name] = currentScore + 1 // Increment score
+	return &lib.User{
+		Name:  name,
+		Score: s.scores[name],
+	}, nil
 }
 
-func (s *SpyPlayerStore) GetLeague() []lib.User {
+func (s *SpyPlayerStore) GetLeague() ([]lib.User, error) {
 
 	league := make([]lib.User, 0, len(s.scores))
 	for name, score := range s.scores {
@@ -71,7 +75,7 @@ func (s *SpyPlayerStore) GetLeague() []lib.User {
 		return league[a].Score > league[b].Score
 	})
 
-	return league
+	return league, nil
 }
 
 // Helper for tests to check RecordWin calls
@@ -144,8 +148,12 @@ func setupTestServer(t *testing.T) (*PlayerServer, *SpyPlayerStore) {
 
 	// --- Updated PUT Handler Simulation (Response unchanged for now) ---
 	mux.HandleFunc("PUT /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
-		playerName := r.PathValue("name")  // Requires Go 1.22+
-		s.RecordWin(playerName)            // Call the updated RecordWin
+		playerName := r.PathValue("name") // Requires Go 1.22+
+		_, err := s.RecordWin(playerName)
+		if err != nil {
+			http.Error(w, "failed to record score", http.StatusInternalServerError)
+			return
+		} // Call the updated RecordWin
 		w.WriteHeader(http.StatusAccepted) // Keep response as Accepted
 	})
 	// --- End Route Setup Simulation ---

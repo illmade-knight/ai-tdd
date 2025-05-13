@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"games/user/lib"
 	"games/user/store"
@@ -18,45 +17,49 @@ import (
 // Assume a function exists to create and configure the server's handler
 // This simulates calling server.Start() without blocking, just setting up routes.
 func NewTestPlayerServer(s store.PlayerStore) *PlayerServer {
-	mux := http.NewServeMux() // Or your router of choice
-
-	// GET Handler logic (copied from previous test setup for completeness)
-	mux.HandleFunc("GET /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
-		playerName := r.PathValue("name") // Go 1.22+
-		score, err := s.GetPlayerScore(playerName)
-		if errors.Is(err, store.ErrUserNotFound) {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		} else if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		user := lib.User{Name: playerName, Score: score}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(user)
-	})
-
-	// PUT Handler logic (copied from previous test setup for completeness)
-	mux.HandleFunc("PUT /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
-		playerName := r.PathValue("name") // Go 1.22+
-		s.RecordWin(playerName)
-		w.WriteHeader(http.StatusAccepted)
-	})
-
-	mux.HandleFunc("GET /league", func(w http.ResponseWriter, r *http.Request) {
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		league := s.GetLeague()
-		json.NewEncoder(w).Encode(league)
-	})
-
-	return &PlayerServer{
-		store:   s,
-		Handler: mux, // The configured router/mux is the handler
-	}
+	//mux := http.NewServeMux() // Or your router of choice
+	//
+	//// GET Handler logic (copied from previous test setup for completeness)
+	//mux.HandleFunc("GET /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
+	//	playerName := r.PathValue("name") // Go 1.22+
+	//	score, err := s.GetPlayerScore(playerName)
+	//	if errors.Is(err, store.ErrUserNotFound) {
+	//		w.WriteHeader(http.StatusNotFound)
+	//		return
+	//	} else if err != nil {
+	//		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	//		return
+	//	}
+	//	user := lib.User{Name: playerName, Score: score}
+	//	w.Header().Set("Content-Type", "application/json")
+	//	w.WriteHeader(http.StatusOK)
+	//	json.NewEncoder(w).Encode(user)
+	//})
+	//
+	//// PUT Handler logic (copied from previous test setup for completeness)
+	//mux.HandleFunc("PUT /user/{name}/score", func(w http.ResponseWriter, r *http.Request) {
+	//	playerName := r.PathValue("name") // Go 1.22+
+	//	s.RecordWin(playerName)
+	//	w.WriteHeader(http.StatusAccepted)
+	//})
+	//
+	//mux.HandleFunc("GET /league", func(w http.ResponseWriter, r *http.Request) {
+	//
+	//	w.Header().Set("Content-Type", "application/json")
+	//	w.WriteHeader(http.StatusOK)
+	//
+	//	league, err := s.GetLeague()
+	//	if err != nil {
+	//		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	//	}
+	//	json.NewEncoder(w).Encode(league)
+	//})
+	//
+	//return &PlayerServer{
+	//	store:   s,
+	//	Handler: mux, // The configured router/mux is the handler
+	//}
+	return NewPlayerServer(store.NewInMemoryPlayerStore())
 }
 
 // --- Integration Test ---
@@ -100,8 +103,8 @@ func TestPlayerServerIntegration(t *testing.T) {
 
 	t.Run("Record win and get score", func(t *testing.T) {
 		playerName := "PlayerOne"
-		putUrl := fmt.Sprintf("%s/user/%s/score", testServer.URL, playerName)
-		getUrl := fmt.Sprintf("%s/user/%s/score", testServer.URL, playerName)
+		putUrl := fmt.Sprintf("%s/players/%s/wins", testServer.URL, playerName)
+		getUrl := fmt.Sprintf("%s/players/%s/wins", testServer.URL, playerName)
 
 		// 1. Record a win (PUT request)
 		req, err := http.NewRequest(http.MethodPut, putUrl, nil)
@@ -138,8 +141,8 @@ func TestPlayerServerIntegration(t *testing.T) {
 
 	t.Run("Record multiple wins", func(t *testing.T) {
 		playerName := "PlayerTwo"
-		putUrl := fmt.Sprintf("%s/user/%s/score", testServer.URL, playerName)
-		getUrl := fmt.Sprintf("%s/user/%s/score", testServer.URL, playerName)
+		putUrl := fmt.Sprintf("%s/players/%s/wins", testServer.URL, playerName)
+		getUrl := fmt.Sprintf("%s/players/%s/wins", testServer.URL, playerName)
 
 		// Record win 1
 		req1, _ := http.NewRequest(http.MethodPut, putUrl, nil)

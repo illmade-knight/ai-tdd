@@ -97,9 +97,18 @@ func TestParquetPlayerStore_RecordWin(t *testing.T) {
 		store, _ := createTempParquetStore(t)
 		playerName := "ExistingPlayer"
 
-		store.RecordWin(playerName) // Score 1
-		store.RecordWin(playerName) // Score 2
-		store.RecordWin(playerName) // Score 3
+		_, err := store.RecordWin(playerName)
+		if err != nil {
+			return
+		} // Score 1
+		_, err = store.RecordWin(playerName)
+		if err != nil {
+			return
+		} // Score 2
+		user, err := store.RecordWin(playerName)
+		if err != nil {
+			return
+		} // Score 3
 
 		score, err := store.GetPlayerScore(playerName)
 		if err != nil {
@@ -107,6 +116,9 @@ func TestParquetPlayerStore_RecordWin(t *testing.T) {
 		}
 		if score != 3 {
 			t.Errorf("expected score 3 after multiple wins, got %d", score)
+		}
+		if score != user.Score {
+			t.Errorf("expected score %d, got %d", user.Score, score)
 		}
 	})
 
@@ -141,7 +153,10 @@ func TestParquetPlayerStore_RecordWin(t *testing.T) {
 func TestParquetPlayerStore_GetLeague(t *testing.T) {
 	t.Run("returns empty slice for empty store", func(t *testing.T) {
 		store, _ := createTempParquetStore(t)
-		league := store.GetLeague()
+		league, err := store.GetLeague()
+		if err == ErrDataSource {
+			t.Errorf("Could not open parquet file, got %v", err)
+		}
 
 		if len(league) != 0 {
 			t.Errorf("expected empty league, got %d items", len(league))
@@ -167,7 +182,10 @@ func TestParquetPlayerStore_GetLeague(t *testing.T) {
 		}
 
 		// Get league from store
-		gotLeague := store.GetLeague()
+		gotLeague, err := store.GetLeague()
+		if err != nil {
+			t.Errorf("could not get league, err = %v", err)
+		}
 
 		// Assert slices are equal (order matters here due to sorting requirement)
 		if !reflect.DeepEqual(gotLeague, expectedLeague) {
@@ -191,7 +209,10 @@ func TestParquetPlayerStore_GetLeague(t *testing.T) {
 			{Name: "Yannis", Score: 1},
 		}
 
-		gotLeague := store.GetLeague()
+		gotLeague, err := store.GetLeague()
+		if err != nil {
+			t.Errorf("could not get league, err = %v", err)
+		}
 
 		if !reflect.DeepEqual(gotLeague, expectedLeague) {
 			t.Errorf("GetLeague returned incorrect or unsorted data after updates:\ngot:  %+v\nwant: %+v", gotLeague, expectedLeague)
